@@ -28,7 +28,7 @@ Select the largest time period on your main Girokonto (3 years) and export it al
 
 ---
 
-The notebook may need updating, if the CSV format by DKS has changed.
+The notebook may need updating, if the CSV format by DKB has changed.
 
 In that case, please update the code and create a pull request to change it here for everyone.
 

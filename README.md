@@ -6,6 +6,10 @@ Analyze .csv from your DKB bank account with Python Pandas.
 
 This is *NOT* an official tool by [Deutsche Kreditbank AG (DKB)](https://www.dkb.de/). It is simply provided-as-is without any warranties, liabilities, etc.
 
+Adapted by [GollyTicker](https://github.com/GollyTicker). Originally created by [blazer82](https://github.com/blazer82).
+
+---
+
 ## Features
 
 * view your balance over the entire exported CSV time-range - or over the last N months
@@ -30,11 +34,10 @@ Select the largest time period on your main Girokonto (3 years) and export it al
 
 ---
 
+## Contributing
+
 The notebook may need updating, if the CSV format by DKB has changed.
 
 In that case, please update the code and create a pull request to change it here for everyone.
 
----
-
-Adapted by [GollyTicker](https://github.com/GollyTicker). Originally created by [blazer82](https://github.com/blazer82).
-
+This tool was shortly discussed on this [Reddit thread](https://www.reddit.com/r/Finanzen/comments/1041ycv/github_financeanalysisdkb_dkb_finanzen_lokal_und/). If anyone wants to extens the code and perhaps automate the extraction of the CSV from the bank, then this thread contains relevant information.

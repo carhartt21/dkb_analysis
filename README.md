@@ -4,6 +4,8 @@ Analyze .csv from your DKB bank account with Python Pandas.
 
 ![DKB Logo](https://upload.wikimedia.org/wikipedia/commons/d/d4/Deutsche_Kreditbank_AG_Logo_2016.svg)
 
+This is *NOT* an official tool by [Deutsche Kreditbank AG (DKB)](https://www.dkb.de/). It is simply provided-as-is without any warranties, liabilities, etc.
+
 ## Features
 
 * view your balance over the entire exported CSV time-range - or over the last N months

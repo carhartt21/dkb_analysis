@@ -1,10 +1,11 @@
-
+# %%
 import pandas as pd
 import csv
 from datetime import datetime
 import matplotlib.pyplot as plt
 import locale
 locale.setlocale(locale.LC_ALL, '') 
+import plotly.graph_objects as go
 
 
 accountname = '2024_Umsatzliste' # set filename of the csv
@@ -52,31 +53,29 @@ print("end balance:",end_balance)
 
 
 # ## Named Columns
+# We define the columns of the csv file for better readability
 
-party = "Zahlungsempfänger*in"
-category = "Kategorie"
+destination = "Zahlungsempfänger*in"
+source = "Zahlungspflichtige*r"
 amount = "Betrag (€)"
 cause = "Verwendungszweck"
-posting_text = "Verwendungszweck"
 balance = "Kontostand (EUR)"
-
+category = "Kategorie"
 
 # ### Cleanup
 
 
 # Fix US / EU decimal-point/comma
-print(data[amount])
+# print(data[amount])
 data[amount] = data[amount].str.replace('.','')
 data[amount] = data[amount].str.replace(',','.')
 data[amount] = data[amount].astype('float')
 
 # avoid nan being interpreted as float in specific columns
-data[party] = data[party].astype(str)
+data[destination] = data[destination].astype(str)
 data[cause] = data[cause].astype(str)
-data[posting_text] = data[posting_text].astype(str)
 
-
-data.head()
+# data.head()
 
 # ### Remove small transactions to avoid noise
 
@@ -95,7 +94,7 @@ data = data.iloc[::-1]
 
 fr = data.index[0]
 to = data.index[-1]
-print(fr,"->",to)
+# print(fr,"->",to)
 
 # ### Compute balance at each transaction
 
@@ -104,58 +103,128 @@ start_balance = end_balance - data_balance
 data[balance] = data[amount].cumsum()+start_balance
 
 
-print("start",start_balance)
-print("end",end_balance)
-print("balance during csv timespan",data_balance)
+# print("start",start_balance)
+# print("end",end_balance)
+# print("balance during csv timespan",data_balance)
 
 # ## Balance over time
 
-data[balance].plot(
-    title='Account balance',
-    grid=True,
-    figsize=(20,8)
-);
-# ## Breakdown by transaction party
+# %%
+# data[balance].plot(
+#     title='Account balance',
+#     grid=True,
+#     figsize=(20,8)
+# )
+# ## Breakdown by transaction destination
 
-print(data.groupby(party).agg({amount:"sum"}))
-print(data)
-empfgroup = data.groupby(party).agg({amount:"sum"})
-
+# print(data.groupby(destination).agg({amount:"sum"}))
+# print(data)
+outgroup = data[data[amount]<0].groupby(destination).agg({amount:"sum"})
 
 # Short the names
-empfgroup.index = [str(i)[:30] for i in empfgroup.index]
+outgroup.index = [str(i)[:50] for i in outgroup.index]
+# outgroup = outgroup.sort_values(amount,ascending=False)
+gutschrift = outgroup[amount] > 0
+colors = list( map(lambda x: "g" if x else "r" , gutschrift))
 
-
-empfgroup[amount].head()
-
-
-
-empfgroup = empfgroup.sort_values(amount,ascending=False)
-gutschrift = empfgroup[amount] > 0
-colors = list( map(lambda x: "g" if x else "r" , gutschrift) )
-
-
-# empfgroup[empfgroup[amount].abs() > 50].plot.barh(
+# outgroup[outgroup[amount].abs() > 50].plot.barh(
 #     figsize=(10,60),
 #     title=u'Aggregierte Zahlungen ab 50€ (%i.%i.%i - %i.%i.%i)' % (fr.day, fr.month, fr.year, to.day, to.month, to.year)
 #   )
 
+ingroup = data.groupby(source).agg({amount:"sum"})
 
-data.head()
+# ingroup[ingroup[amount]>0].plot.barh(
+#     figsize=(10,60),
+#     title=u'Einkünfte (%i.%i.%i - %i.%i.%i)' % (fr.day, fr.month, fr.year, to.day, to.month, to.year)
+# )
 
+in_categories = {
+    "Gehalt": [
+        "Christoph Gerhardt",
+        "Milica Gerhardt",
+    ],
+    "Miete": [
+        "Alexander",
+        "Helga",
+    ],
+    }
+# %%
+def mapInCategory(x):
+    # use transaction details to map to a category
+    p = x[source].lower()
+    c = x[cause].lower()
+    
+    # mappings by category
+    for cat, cat_words in in_categories.items():
+        if any(map(lambda r: r.lower() in p, cat_words)) or any(map(lambda r: r.lower() in c, cat_words)):
+            return cat
+    # return in_categories["Sonstiges"][0]
+    return p
+
+data[category] = data.apply(lambda x: mapInCategory(x), axis=1)
+# Sum the entries for each category in the 'amount' column
+inbyCategory = data[data[amount] > 0]
+inbyCategory = inbyCategory.groupby(category)
+inbyCategoryTotal = inbyCategory.agg({amount:"sum"})
+# Prepare data for Sankey diagram
+labels = [str(i)[:50] for i in inbyCategoryTotal.index] + ["Total Income"]
+sources = list(range(len(inbyCategoryTotal)))
+targets = [len(inbyCategory)] * len(inbyCategoryTotal)
+values = inbyCategoryTotal[amount].abs().tolist()
+
+# Create Sankey diagram
+fig = go.Figure(data=[go.Sankey(
+    valueformat = ".0f",
+    valuesuffix = "€",    
+    node=dict(
+        pad=15,
+        thickness=20,
+        line=dict(color="black", width=0.5),
+        label=labels,
+    ),
+    link=dict(
+        source=sources,
+        target=targets,
+        value=values,
+    ))])
+
+fig.update_layout(title_text="Eingänge nach Kategorie", font_size=10)
+fig.show()
+
+
+
+# Prepare data for Sankey diagram
+labels = list(ingroup.index) + ["Total Income"]
+sources = list(range(len(ingroup)))
+targets = [len(ingroup)] * len(ingroup)
+values = ingroup[amount].tolist()
+
+# Create Sankey diagram
+fig = go.Figure(data=[go.Sankey(
+    valueformat = ".0f",
+    valuesuffix = "€",    
+    node=dict(
+        pad=15,
+        thickness=20,
+        line=dict(color="black", width=0.5),
+        label=labels,
+    ),
+    link=dict(
+        source=sources,
+        target=targets,
+        value=values,
+    ))])
+
+fig.update_layout(title_text="Eingänge nach ", font_size=10)
+fig.show()
 
 # ## Breakdown by Category
 # We use some heuristics on the tranasaction details to put them into different categories.
-# All transactions within a category will be aggregated for a better overall analysis.
-# You may need to check the print output of the next cell and possibly adapt the mapping function for a better categorisation.
-# 
-# **the text will be lower cased before categorisation**
-# 
-# **Feel free to change these heuristic mappings - or adapt the code to map according to specififc transaction details.**
 
 
-
-categories = {
+#%% 
+out_categories = {
     "Gastronomie": [
         "restaurant",
         "gastro",
@@ -438,60 +507,46 @@ categories = {
     ]
 }
 
-def mapToCategory(x):
-    # use these transaction details to map to a category
-    p = x[party].lower()
-    pt = x[posting_text].lower()
+def mapOutCategory(x):
+    # use transaction details to map to a category
+    p = x[destination].lower()
     c = x[cause].lower()
     
-    # manual mappings
-    if "WERTP. ABRECHN".lower() in c or "Depot ".lower() in c or "WERTPAPIER".lower() in c:
-        return "investment"
-    
-    if "miete ".lower() in c:
-        return "miete"
-    
-    if "KREDITKARTENABRECHNUNG".lower() in c:
-        return "card_payment"
-    
     # mappings by category
-    for cat, cat_words in categories.items():
-        if any(map(lambda r: r.lower() in p, cat_words)) or any(map(lambda r: r.lower() in pt, cat_words)):
+    for cat, cat_words in out_categories.items():
+        if any(map(lambda r: r.lower() in p, cat_words)) or any(map(lambda r: r.lower() in c, cat_words)):
             return cat
-    
-    # debitcard. may need adaptation
-    if "Debitk.20 VISA Debit".lower() in c:
-        return "card_payment"
-    
     return p
 
-data[category] = data.apply(lambda x: mapToCategory(x), axis=1)
+data[category] = data.apply(lambda x: mapOutCategory(x), axis=1)
 
-print(len(data[category].unique()),"categories")
+print(len(data[category].unique()),"out_categories")
 
 print("============ uncategorized =================")
 s = 0
-for x in data[category].unique():
-    ok = False
+# for x in data[category].unique():
+#     ok = False
     
-    for cat in categories.keys():
-        if x == cat:
-            ok = True
+#     for cat in out_categories.keys():
+#         if x == cat:
+#             ok = True
 
-    if not ok:
-        print(x)
-        idx = data[category] == x
-        s = s + abs(data[idx][amount].sum())
+#     if not ok:
+#         print(x)
+#         idx = data[category] == x
+#         s = s + abs(data[idx][amount].sum())
         
 
 
-# Breakdown by category. (Ignored transactions below 10€).
+# Breakdown by category
+# Ignore groups below minimum amount
+minimum_amount = 200
+byCategory = data.groupby(category).agg({amount:"sum"})
+byCategory = byCategory[abs(byCategory[amount]) > minimum_amount]
 
-
-byCategory = data.groupby(category).agg({amount:"sum"}).sort_values(amount,ascending=False)
-byCategory = byCategory[abs(byCategory[amount]) > 200]
-    
+# outgoing transactions (amount is negative)
 costs = byCategory[byCategory[amount] < 0]
+# invert the amounts for better readability
 costs.loc[:, amount] = -costs[amount]
 
 total_costs = costs[amount].sum()
@@ -533,9 +588,11 @@ plt.show()
 # plt.show()
 
 
-quick_category_analyse("Paypal",desc=cause)
+# quick_category_analyse("Paypal",desc=cause)
 
-quick_category_analyse("Reise", desc=cause)
+# quick_category_analyse("Reise", desc=cause)
 
-quick_category_analyse("Energie", desc=party)
+# quick_category_analyse("Energie", desc=destination)
 
+
+# %%
